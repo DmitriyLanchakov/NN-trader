@@ -10,22 +10,23 @@ import datetime as dt
 from pytrends.request import TrendReq
 import pandas as pd
 import time
-import matplotlib.pyplot as plt
 import random
 
 
-#INPUTS
-google_username = "fredrik.hellander@gmail.com"
-google_password = "Hellokitt3n"
-keyword=['C-rad']
-enddate=dt.date.today() - dt.timedelta(days=3)
-startdate= enddate - dt.timedelta(days=365*2)
+#--------------INPUTS NEEDED ----------------------------
+google_username = "delander58@gmail.com"
+google_password = "Oddshora1"
+keyword=['Starbreeze']
+enddate=dt.datetime(2017,3,20)
+startdate= dt.datetime(2013,4,28)
 sample_win_size=250
 min_sample_size=100
-sleeps=30
+sleeps=3 #delay not to overload google trends request
+#--------------INPUTS NEEDED ----------------------------
 
 
-#Creating array for storing sampling
+
+#Creating  array for storing sampling
 index=pd.date_range(startdate, enddate)
 index =[dt.date(t.year,t.month,t.day) for t in index]
 sampled=pd.DataFrame( data=0.0 , index=index, columns=['Google Trend', 'Samplings'])
@@ -41,55 +42,42 @@ win_back=win_front-dt.timedelta(days=(sample_win_size-1))
 #sampling while end of sampling window is not infront of enddate and 
 #sample window sice has not been shrunk to less than min_sample_size
 run=0
-while (win_back <= enddate) and ((win_front - win_back).days>=min_sample_size) :
+while (win_back <= enddate) and ((win_front - win_back).days>=min_sample_size):
     
-    print('Sampling run', run)
-    print('% Complete', (100.0*run/(sample_win_size+(enddate-startdate).days-min_sample_size )))
-   
+    #Printing status and % progress
+    print('Sampling run number: %i' %run)
+    print('Sampling %.1f percent complete' %(100.0*run/(sample_win_size+(enddate-startdate).days-min_sample_size )))
+    
+    
+    #Pulling googel trends data to sampling window via googel trends API
     timeframe=win_back.strftime("%Y-%m-%d") +" " + win_front.strftime("%Y-%m-%d")
     connector.build_payload(kw_list=keyword, timeframe=timeframe, geo='SE')
     window = connector.interest_over_time()
     window.index = [dt.date(t.year,t.month,t.day) for t in window.index]
-    
     time.sleep(sleeps*random.random())
 
+    #Adding google trends data to corresponding date in sampling dataframe
     for d in window.index:
         if d in sampled.index:
             sampled.loc[d]['Google Trend']=sampled.loc[d]['Google Trend'] +window.loc[d][keyword]
             sampled.loc[d]['Samplings']=sampled.loc[d]['Samplings'] +1
             
+     #Shifting sampling window forward by one day                  
     win_front=win_front+ dt.timedelta(days=1)    
     win_back=win_back + dt.timedelta(days=1)  
     
+    #If end date is reached sampling window size shrunk by one day
     if (dt.date.today()-win_front).days<=3:
         win_front = dt.date.today()-dt.timedelta(3)
-    
+      
     run+=1
             
 
-#normalizing
+#normalizing each date according to the number of samples drawn
 sampled['Google Trend'] = sampled['Google Trend']/sampled['Samplings']
 
-endcomp=enddate
-startcomp= enddate - dt.timedelta(days=250)
 
-connector = TrendReq(google_username, google_password)           
-timeframe=startcomp.strftime("%Y-%m-%d") +" " + endcomp.strftime("%Y-%m-%d")
-connector.build_payload(kw_list=keyword, timeframe=timeframe, geo='SE')
-compare = connector.interest_over_time()          
-    
-
-        
-
-ax=plt.axes()
-sampled['Google Trend'].plot()
-compare['Cortus Energy'].plot()
-            
-            
-        
-
-glt_rm5=pd.rolling_mean(sampled['Google Trend'], 5, min_periods=1)    
-
-ax=plt.axes()
-sampled['Google Trend'].plot()
-glt_rm5.plot()
+#Saving sampled data from googel to CSV file and pickle file
+sampled.to_pickle(keyword[0]+'.p')
+sampled.to_csv(keyword[0]+'.csv', columns=['Google Trend'], index=True)
+      
