@@ -1,17 +1,10 @@
 
-
-
 import cPickle as pickle
 import numpy as np
 import tensorflow as tf
 import random
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
-
-
-
-
-
 
 
 valid_dataset=np.load('./data-processing/valdation_data.npy').astype(np.float32)
@@ -23,11 +16,8 @@ train_reg=np.load('./data-processing/training_reg.npy').astype(np.float32)
 num_variables= train_dataset.shape[1]
 
 depth1=16
-depth2=32
-depth3=64
-depth4=32
-depth5=16
-
+depth2=16
+depth3=16
 
 graph = tf.Graph()
 
@@ -41,94 +31,71 @@ with graph.as_default():
   tf_train_reg = tf.constant(train_reg)
   
   
-
-
   
   #Fully connected layer weights
   layer1_weights = tf.Variable(tf.truncated_normal(
-      [num_variables, depth1], mean=0.0, stddev=0.1))
-  
-  layer1_biases = tf.Variable(tf.constant(0.1, shape=[depth1]))
-  
+      [num_variables, depth1], mean=0.0, stddev=0.5))
+  layer1_biases = tf.Variable(tf.constant(0.5, shape=[depth1]))
   layer2_weights = tf.Variable(tf.truncated_normal(
-      [depth1, depth2], mean=0.0, stddev=0.1))
-  
-  layer2_biases = tf.Variable(tf.constant(0.1, shape=[depth2]))
-  
+      [depth1, depth2], mean=0.0, stddev=0.5))
+  layer2_biases = tf.Variable(tf.constant(0.5, shape=[depth2]))
   layer3_weights = tf.Variable(tf.truncated_normal(
-      [depth2, depth3], mean=0.0, stddev=0.1))
-  
-  layer3_biases = tf.Variable(tf.constant(0.1, shape=[depth3]))
-
-  layer4_weights = tf.Variable(tf.truncated_normal(
-      [depth3, depth4], mean=0.0, stddev=0.1))
-  
-  layer4_biases = tf.Variable(tf.constant(0.1, shape=[depth4]))  
-  
-  layer5_weights = tf.Variable(tf.truncated_normal(
-      [depth4, depth5], mean=0.0, stddev=0.1))
-  
-  layer5_biases = tf.Variable(tf.constant(0.1, shape=[depth5]))  
-
+      [depth2, depth3], mean=0.0, stddev=0.5))
+  layer3_biases = tf.Variable(tf.constant(0.5, shape=[depth3]))
 
   
   reg_weights = tf.Variable(tf.truncated_normal(
-      [depth5, 1], mean=0.0, stddev=0.1))
+      [depth3, 1], mean=0.0, stddev=0.1))
   reg_biases = tf.Variable(tf.constant(0.1, shape=[1]))  
  
 
 
    
   # Model.
-  def model(data, drop_rate=1.0):
+  def model(data, keep_prob=1.0):
 
     # Construct a 2 layer Neural Net
     # Input size: batch x num_variables
     # 1st Layer : fully connected [num_variables, 16]
     # Relu
-    # 2nd Layer: fully connected [16, 32]
+    # Dropout
+    # 2nd Layer: fully connected [16, 16]
     # Relu
-    
-    # Output layer, [32 1]
+    # Dropout
+    # 3rd Layer: fully connected [16, 16]
+    # Relu
+    # Dropout
+        
+    # Output layer, [16 1]
     
     layer1 = tf.matmul(data, layer1_weights)
     relu=tf.nn.relu(layer1 + layer1_biases)
-    layer2 = tf.matmul(relu, layer2_weights)
-    relu= tf.nn.relu(layer2 + layer2_biases)
-    layer3 = tf.matmul(relu, layer3_weights)
-    relu= tf.nn.relu(layer3 + layer3_biases)
-    layer4 = tf.matmul(relu, layer4_weights)
-    relu= tf.nn.relu(layer4 + layer4_biases)
-    layer5 = tf.matmul(relu, layer5_weights)
-    relu= tf.nn.relu(layer5 + layer5_biases)
-
+    drop=tf.nn.dropout(relu, keep_prob)
     
+    layer2 = tf.matmul(drop, layer2_weights)
+    relu= tf.nn.relu(layer2 + layer2_biases)
+    drop=tf.nn.dropout(relu, keep_prob)
+    
+    layer3 = tf.matmul(drop, layer3_weights)
+    relu= tf.nn.relu(layer3 + layer3_biases)
+    drop=tf.nn.dropout(relu, keep_prob)
+        
     output = tf.matmul(relu, reg_weights + reg_biases)
     
     return output
   
   # Training computation.
-  train_predictions = model(tf_train_dataset, 1.0)
+  train_predictions = model(tf_train_dataset, 0.2)
   loss = tf.reduce_mean(tf.square((train_predictions - tf_train_reg)))
 
   # Optimizer.
-  optimizer = tf.train.AdagradOptimizer(0.025).minimize(loss)
-  
-  #global_step = tf.Variable(0)
-  #learning_rate = tf.train.exponential_decay(0.05, global_step, 2000, 0.95)
-  #optimizer = tf.train.AdagradOptimizer(learning_rate).minimize(loss, global_step=global_step)
-  
+  optimizer = tf.train.AdagradOptimizer(0.05).minimize(loss)
   
   #Validation Predictions
   valid_predictions = model(tf_valid_dataset)
   
 
-
-    
-    
-
-
-num_steps = 10000
+num_steps = 3000
 
 import time
 start = time.time()  
@@ -149,13 +116,13 @@ with tf.device('/cpu:0'):
     #while max_acc - acc < 1.0 :
       _, l, predictions = session.run( [optimizer, loss, train_predictions])
       step += 1
-      if (step % 500 == 0):
-            print('Loss at step %d: %f' % (step, l))
-            print('Training R^2-score: %.1f%%' %r2_score(train_reg, predictions))
-            print('Validation R^2-score: %.1f%%' %r2_score(valid_reg, valid_predictions.eval()))
+      if (step % 100 == 0):
+            print('Loss at step %d: %.2f' % (step, l))
+            print('Training R^2-score: %.2f' %r2_score(train_reg, predictions))
+            valid_preds=valid_predictions.eval()
+            print('Validation R^2-score: %.2f' %r2_score(valid_reg, valid_preds))
          
     
-
     save_path = saver.save(session, "saved_model.ckpt") 
     print("Model saved in file: %s" % save_path)
 
