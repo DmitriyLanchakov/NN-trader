@@ -9,11 +9,16 @@ Created on Sat Mar 25 14:46:26 2017
 import pandas as pd
 import datetime as dt
 from pandas_datareader import data as web
+import numpy as np
+
 
 
 
 stocks= ['Fingerprint Cards', 'Anoto', 'Shamaran', 'Africa Oil', 'Kancera', 
 'Cybaero', 'Cassandra Oil', 'Arcam', 'Lucara Diamond', 'Starbreeze', 'Precise Biometrics']
+
+
+
 
 gt_norm_period=60
 rolling_mean_periods = [2,5,7,14,21,28]
@@ -37,7 +42,7 @@ ticker_key={
 
 vol_norm_period = 60
 
-vol_rm_periods = [2,5,10,15,20]
+vol_rm_periods = [1,2,5,10,15,20]
 gain_lags = [1,2,3,4,5,10]
 
 
@@ -46,12 +51,15 @@ price_norm_periods = [60]
 price_rm_periods = [1,2,5,10,15,20]
 
 
-reg_target='5Day_Gain'
+reg_target=['5Day_Gain']
 GT_variables=['Google Trend', 'RM_2', 'RM_5', 'RM_7', 'RM_14']
-vol_variables = ['Norm_Volume', 'NormVol_RM_2', 'NormVol_RM_5', 'NormVol_RM_10', 'NormVol_RM_15' ]
+vol_variables = ['NormVol_RM_1', 'NormVol_RM_2', 'NormVol_RM_5', 'NormVol_RM_10', 'NormVol_RM_15' ]
 price_variables = ['P_RM1_norm60', 'P_RM2_norm60', 'P_RM5_norm60', 'P_RM10_norm60', 'P_RM15_norm60']
 
+input_variables = vol_variables + price_variables
 
+
+validation_days=100
 
 #Dictionary to save google trends data for each stock
 google_trends={}
@@ -85,13 +93,11 @@ for stock in stocks:
 
     #Calulating rolling volume mean for normalization
     vol_norm=pd.rolling_mean(stock_data[stock]['Volume'], vol_norm_period, min_periods=vol_norm_period) 
-    stock_data[stock]['Volume'] = ( stock_data[stock]['Volume']- vol_norm)/vol_norm
-    stock_data[stock]=stock_data[stock].rename(columns={'Volume':'Norm_Volume'})         
 
-
-    #Calculating volume rolling means from the normalized values and saving 
+    #Calculating volume short rolling means, normalizing and saving 
     for period in vol_rm_periods:
-        rolling_mean=pd.rolling_mean( stock_data[stock]['Norm_Volume'], period, min_periods=period).rename('NormVol_RM_' + str(period))
+        rolling_mean=pd.rolling_mean(stock_data[stock]['Volume'], period, min_periods=period)
+        rolling_mean= ((rolling_mean -vol_norm)/vol_norm).rename('NormVol_RM_' + str(period))
         stock_data[stock] = pd.concat([stock_data[stock], rolling_mean], axis=1)
 
 
@@ -114,29 +120,42 @@ for stock in stocks:
 
 
 
-
+#Initializing dicts and arrays to sort data into training and validation 
 reg_values={}
-gt_inputs = {}
-vol_inputs = {}
+input_data={}
+training_data = np.empty((0,len(input_variables + GT_variables)))
+training_reg = np.empty((0,1))
+validation_data = np.empty((0,len(input_variables + GT_variables)))
+validation_reg = np.empty((0,1))
 
-for stock in stocks:
+
+#Selecting input variables to be used and removing any dates with NA data
+for stock in stocks: 
+    input_data[stock] = stock_data[stock][input_variables +reg_target]
+    gt_inputs = google_trends[stock][GT_variables]
+    input_data[stock] = pd.concat([input_data[stock], gt_inputs], axis=1).dropna(axis=0) 
+    string='Valid data for ' + str(stock) + ' in range ' +input_data[stock].index[0].strftime('%Y-%m-%d') +' to ' +  input_data[stock].index[-1].strftime('%Y-%m-%d')
+    print(string)   
+    reg_values[stock] = input_data[stock][reg_target]
+    del input_data[stock][reg_target[0]]
     
-    reg_values[stock] = stock_data[stock][reg_target]
-    gt_inputs[stock] = google_trends[stock][GT_variables]
-    vol_inputs[stock] = stock_data[stock][vol_variables]
     
-    
-
-
-
+    #Splitting training and validation data in chronological order and according to nr validation days
+    valid_date_split = stock_data[stock].index[-1] - dt.timedelta(days=validation_days)
     
 
+    #Slicing data and saving np arrays 
+    np.save('training_data__' + stock,input_data[stock].loc[:valid_date_split].as_matrix())
+    np.save('validation_data_' +stock, input_data[stock].loc[valid_date_split:].as_matrix())
+    np.save('training_reg_' + stock,reg_values[stock].loc[:valid_date_split].as_matrix() )
+    np.save('validation_reg_' +stock, reg_values[stock].loc[valid_date_split:].as_matrix())
+    
+    np.save('backtest_data_' +stock, input_data[stock].loc[valid_date_split:].as_matrix())
+    np.save('backtest_price_' +stock, stock_data[stock]['Adj Close'].loc[valid_date_split:].as_matrix())
 
 
-
-test=stock_data['Africa Oil']
-
-
+print('Variables used: ' +str(GT_variables) + str(input_variables ))
+print('Regression Goal: ' +str(reg_target))
 
 
 

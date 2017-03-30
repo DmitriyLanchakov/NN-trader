@@ -14,14 +14,14 @@ import random
 
 
 #--------------INPUTS NEEDED ----------------------------
-google_username = "delander58@gmail.com"
+google_username = "scrapperpapper1@gmail.com"
 google_password = "Oddshora1"
-keyword=['Starbreeze']
-enddate=dt.datetime(2017,3,20)
-startdate= dt.datetime(2013,4,28)
+keyword=['Lucara Diamond']
+enddate=dt.date(2017,3,20)
+startdate= dt.date(2013,4,28)
 sample_win_size=250
 min_sample_size=100
-sleeps=3 #delay not to overload google trends request
+sleeps=2 #delay not to overload google trends request
 #--------------INPUTS NEEDED ----------------------------
 
 
@@ -46,7 +46,7 @@ while (win_back <= enddate) and ((win_front - win_back).days>=min_sample_size):
     
     #Printing status and % progress
     print('Sampling run number: %i' %run)
-    print('Sampling %.1f percent complete' %(100.0*run/(sample_win_size+(enddate-startdate).days-min_sample_size )))
+    print('Sampling %.2f percent complete' %(100.0*run/(sample_win_size+(enddate-startdate).days-min_sample_size )))
     
     
     #Pulling googel trends data to sampling window via googel trends API
