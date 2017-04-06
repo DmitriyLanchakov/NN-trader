@@ -14,8 +14,8 @@ import random
 
 
 #--------------INPUTS NEEDED ----------------------------
-google_username = "scrapperpapper1@gmail.com"
-google_password = "Oddshora1"
+google_username = "google@gmail.com"
+google_password = "Password"
 keyword=['Lucara Diamond']
 enddate=dt.date(2017,3,20)
 startdate= dt.date(2013,4,28)
